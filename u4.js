@@ -69,6 +69,7 @@ function keydown(event) {
 		case "ArrowDown":	move(0,1);	break;
 		case "KeyE":		enter();	break;
 		case "Backquote":	toggleCreativeMode();	break;
+		case "KeyT":		talk();		break;
 	}
 }
 
@@ -128,6 +129,16 @@ function leave() {
 	viewX = ms.x;
 	viewY = ms.y;
 	draw();
+}
+
+function talk() {
+	var ai = getAI(viewX, viewY);
+	if(ai==null) {
+		feedback("Funny, no response!");
+		return;
+	}
+
+	feedback("You meet "+ai.description);
 }
 
 var mouseState = 0;
@@ -217,6 +228,19 @@ function mapClicked(event) {
 }
 
 //-------------------------------------------------------------
+// AI functions
+//-------------------------------------------------------------
+
+function moveAI() {
+	var folk = map.folk;
+	if(folk==null) return;
+
+	var i; for(i=0; i<folk.length; i++) {
+	}
+}
+
+
+//-------------------------------------------------------------
 // tile functions
 //-------------------------------------------------------------
 
@@ -290,12 +314,18 @@ function getMap(x, y) {
 
 	x = (x+map.width)%map.width;
 	y = (y+map.height)%map.height;
-	//if(x<0) x+=map.width;
-	//if(x>=map.width) x-=map.width;
-	//if(y<0) y+=map.height;
-	//if(y>=map.height) y-=map.height;
 	var t = map.data.substr(y*map.width*2+x*2,2);
 	return parseInt(t, 16);
+}
+
+function getAI(x, y) {
+	var folk = map.folk;
+	if(folk==null) return;
+	var i; for(i=0; i<folk.length; i++) {
+		var person = folk[i];
+		if(person.x==x && person.y==y) return person;
+	}
+	return null;
 }
 
 function getTile(c) {
@@ -355,7 +385,15 @@ function draw() {
 		var offsetX = -(viewWidth >> 1);
 		for(x=0; x<viewWidth; x++) {
 			var t = document.getElementById("g"+y+x);
-			var c = offsetX==0 && offsetY==0 ? 31 : vis[y*viewWidth+x] > party.vis ? 126 : getMap(viewX+offsetX, viewY+offsetY);
+			var ai = getAI(x, y);
+			var c = 0;
+			if(offsetX==0 && offsetY==0) c = 31; // party FIXME
+			else if(vis[y*viewWidth+x] > party.vis) c = 126;	// can't see FIXME
+			else {
+				var ai = getAI(viewX+offsetX, viewY+offsetY);
+				if(ai!=null) c = ai.tile;
+				else c = getMap(viewX+offsetX, viewY+offsetY);
+			}
 			t.style.backgroundPosition = getTile(c);
 			offsetX++;
 		}
