@@ -43,6 +43,7 @@ function init() {
 	main.addEventListener("keydown", keydown);
 	draw();
 
+	feedbackPrompt("> ");
 	//var music = document.getElementById("music");
 	//music.autoplay=true;
 	//music.loop=true;
@@ -60,17 +61,98 @@ function debug(msg) {
 // input
 //-------------------------------------------------------------
 
+var inputMode = 0;	// 0 = key, 1 = line, 2 = callback
+var inputCallback = null;
+var inputLine = "";
+
 function keydown(event) {
-	debug("Key = "+event.code);
-	switch(event.code) {
+	debug("Key = "+event.key);
+	input(event.key);
+
+//	switch(event.code) {
+//		case "ArrowLeft":	move(-1,0);	break;
+//		case "ArrowRight":	move(1,0);	break;
+//		case "ArrowUp":		move(0,-1);	break;
+//		case "ArrowDown":	move(0,1);	break;
+//		case "KeyE":		enter();	break;
+//		case "Backquote":	toggleCreativeMode();	break;
+//		case "KeyT":		talk();		break;
+//	}
+}
+
+function getDir(msg, f) {
+	feedback(msg+" - ");
+	inputCallback = function(c) {
+		switch(c) {
+		case "ArrowLeft":
+			feedback("West");
+			feedbackPrompt("");
+			f(-1,0);
+			break;
+		case "ArrowRight":
+			feedback("East");
+			feedbackPrompt("");
+			f(1,0);
+			break;
+		case "ArrowUp":
+			feedback("North");
+			feedbackPrompt("");
+			f(0,-1);
+			break;
+		case "ArrowDown":
+			feedback("South");
+			feedbackPrompt("");
+			f(0,1);
+			break;
+		default:
+			feedback("Cancel");
+			break;
+		}
+	};
+	inputMode = 2;
+}
+
+function command(c) {
+	switch(c) {
 		case "ArrowLeft":	move(-1,0);	break;
 		case "ArrowRight":	move(1,0);	break;
 		case "ArrowUp":		move(0,-1);	break;
 		case "ArrowDown":	move(0,1);	break;
-		case "KeyE":		enter();	break;
-		case "Backquote":	toggleCreativeMode();	break;
-		case "KeyT":		talk();		break;
+		case "e":		enter();	break;
+		case "`":		creative();	break;
+		case "t":		getDir("Talk", talk);	break;
 	}
+}
+
+function input(c) {
+	switch(inputMode) {
+		case 0:	// single key command
+			command(c);
+			break;
+
+		case 1:
+			if(c=="Enter") {
+				var f = inputCallback;
+				f(inputLine);
+				inputLine = "";
+				break;
+			}
+			inputLine += c;
+			feedback(c);
+			break;
+
+		case 2:
+			if(inputCallback==null) {
+				feedback("Bug!");
+				break;
+			}
+			var f = inputCallback;
+			inputCallback = null;
+			inputMode = 0;
+			f(c);
+			break;
+	}
+	if(inputMode==0) feedbackPrompt("> ");
 }
 
 function toggleCreativeMode() {
@@ -131,14 +213,39 @@ function leave() {
 	draw();
 }
 
-function talk() {
-	var ai = getAI(viewX, viewY);
+function talk(dx, dy) {
+	var x = saneX(viewX+dx);
+	var y = saneY(viewY+dy);
+	var ai = getAI(x, y);
 	if(ai==null) {
 		feedback("Funny, no response!");
 		return;
 	}
 
 	feedback("You meet "+ai.description);
+	inputMode = 1;
+	feedbackPrompt("- ");
+	inputCallback = function (line) {
+		if(line=="") {
+			feedbackPrompt("");
+			feedback("Bye");
+			inputMode = 0;
+			return;
+		}
+
+		var say = line.toUpperCase().substr(0,4);
+		var r = ai.responses[say];
+		if(r == null) {
+			feedbackPrompt("");
+			feedback("That I cannot help thee with.");
+			feedbackPrompt("- ");
+			return;
+		}
+
+		feedbackPrompt("");
+		feedback(r);
+		feedbackPrompt("- ");
+	}
 }
 
 var mouseState = 0;
@@ -307,6 +414,9 @@ function canPass(c) {
 // map functions
 //-------------------------------------------------------------
 
+function saneX(x) { return !map.wrap && (x<0 || x>=map.width) ? -1 : (x+map.width)%map.width; }
+function saneY(y) { return !map.wrap && (y<0 || y>=map.width) ? -1 : (y+map.height)%map.height; }
+
 function getMap(x, y) {
 	if(!map.wrap && (x<0 || x>=map.width || y<0 || y>=map.height)) {
 		return map.wrapTile;
@@ -406,17 +516,24 @@ function draw() {
 
 var messages = [];
 function feedback(msg) {
-	if(messages.length > 5) messages.shift();
-	messages.push(msg);
+	messages[messages.length-1] += msg;
+	feedbackUpdate();
+}
 
+function feedbackUpdate() {
 	var control = document.getElementById("messages");
 	var text = "";
 	var i;
 	for(i=0; i<messages.length; i++) {
-		text += "> " + messages[i] + "<br>";
+		text += messages[i] + "<br>";
 	}
-	text += "> ";
 	control.innerHTML = text;
+}
+
+function feedbackPrompt(p) {
+	if(messages.length > 6) messages.shift();
+	messages.push(p);
+	feedbackUpdate();
 }
 
 function getMoveText(dx, dy) {
