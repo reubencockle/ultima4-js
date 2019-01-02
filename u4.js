@@ -114,13 +114,37 @@ function getDir(msg, f) {
 
 function command(c) {
 	switch(c) {
-		case "ArrowLeft":	move(-1,0);	break;
-		case "ArrowRight":	move(1,0);	break;
-		case "ArrowUp":		move(0,-1);	break;
-		case "ArrowDown":	move(0,1);	break;
-		case "e":		enter();	break;
-		case "`":		creative();	break;
-		case "t":		getDir("Talk", talk);	break;
+		case "ArrowLeft":
+		case "4":
+			move(-1,0);
+			break;
+
+		case "ArrowRight":
+		case "6":
+			move(1,0);
+			break;
+
+		case "ArrowUp":	
+		case "8":
+			move(0,-1);
+			break;
+
+		case "ArrowDown":
+		case "2":
+			move(0,1);
+			break;
+
+		case "e":
+			enter();
+			break;
+
+		case "`":
+			creative();
+			break;
+
+		case "t":
+			getDir("Talk", talk);
+			break;
 	}
 }
 
@@ -155,7 +179,7 @@ function input(c) {
 	if(inputMode==0) feedbackPrompt("> ");
 }
 
-function toggleCreativeMode() {
+function creative() {
 	if(party.vis==1) {
 		party.vis=99;
 		party.transport=1;
@@ -226,7 +250,7 @@ function talk(dx, dy) {
 	inputMode = 1;
 	feedbackPrompt("- ");
 	inputCallback = function (line) {
-		if(line=="") {
+		if(line=="" || line=="bye") {
 			feedbackPrompt("");
 			feedback("Bye");
 			inputMode = 0;
@@ -251,6 +275,7 @@ function talk(dx, dy) {
 var mouseState = 0;
 var mouseDX = 0;
 var mouseDY = 0;
+var mouseDir = -1;
 var moveTimer = undefined;
 
 function mouseDown(event) {
@@ -294,9 +319,11 @@ function mouseMove(event) {
 	var y = event.y - grid.offsetTop - grid.clientHeight/2;
 	var m = document.getElementById("mouse");
 	var a = Math.round(Math.atan2(y, x) * 4 / Math.PI);
-	m.innerText = "x="+x+", y="+y+", a="+a;
+	mouseDir = a+4 & 7;
+	m.innerText = "x="+x+", y="+y+", a="+mouseDir;
 
 	if(x>-16 && x<16 && y>-16 && y<16) {
+		mouseDir = -1;
 		mouseDX = 0;
 		mouseDY = 0;
 		return;
