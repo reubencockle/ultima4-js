@@ -15,7 +15,7 @@ var grid = undefined;
 var mouseSpeed = 50;
 
 var party = {
-transport: 0, vis: 1
+transport: 0, vis: 1, creative: false,
 };
 
 
@@ -68,16 +68,6 @@ var inputLine = "";
 function keydown(event) {
 	debug("Key = "+event.key);
 	input(event.key);
-
-//	switch(event.code) {
-//		case "ArrowLeft":	move(-1,0);	break;
-//		case "ArrowRight":	move(1,0);	break;
-//		case "ArrowUp":		move(0,-1);	break;
-//		case "ArrowDown":	move(0,1);	break;
-//		case "KeyE":		enter();	break;
-//		case "Backquote":	toggleCreativeMode();	break;
-//		case "KeyT":		talk();		break;
-//	}
 }
 
 function getDir(msg, f) {
@@ -112,49 +102,13 @@ function getDir(msg, f) {
 	inputMode = 2;
 }
 
-function command(c) {
-	switch(c) {
-		case "ArrowLeft":
-		case "4":
-			move(-1,0);
-			break;
-
-		case "ArrowRight":
-		case "6":
-			move(1,0);
-			break;
-
-		case "ArrowUp":	
-		case "8":
-			move(0,-1);
-			break;
-
-		case "ArrowDown":
-		case "2":
-			move(0,1);
-			break;
-
-		case "e":
-			enter();
-			break;
-
-		case "`":
-			creative();
-			break;
-
-		case "t":
-			getDir("Talk", talk);
-			break;
-	}
-}
-
 function input(c) {
 	switch(inputMode) {
 		case 0:	// single key command
 			command(c);
 			break;
 
-		case 1:
+		case 1:	// line mode
 			if(c=="Enter") {
 				var f = inputCallback;
 				f(inputLine);
@@ -176,37 +130,105 @@ function input(c) {
 			f(c);
 			break;
 	}
-	if(inputMode==0) feedbackPrompt("> ");
+
+	if(inputMode==0) {
+		moveAI();
+		draw();
+		feedbackPrompt("> ");
+	}
+}
+
+//-------------------------------------------------------------
+// commands
+//-------------------------------------------------------------
+
+function command(c) {
+	switch(c) {
+		case "1":
+			move(-1,1);
+			break;
+
+		case "2":
+		case "ArrowDown":
+			move(0,1);
+			break;
+
+		case "3":
+			move(1,1);
+			break;
+
+		case "4":
+		case "ArrowLeft":
+			move(-1,0);
+			break;
+
+		case "5":
+			doTileAction();
+			break;
+
+		case "6":
+		case "ArrowRight":
+			move(1,0);
+			break;
+
+		case "7":
+			move(-1,-1);
+			break;
+
+		case "8":
+		case "ArrowUp":	
+			move(0,-1);
+			break;
+
+		case "9":
+			move(1,-1);
+			break;
+
+		case "d":
+			descend();
+			break;
+
+		case "e":
+			enter();
+			break;
+
+		case "k":
+			climb();
+			break;
+
+		case "t":
+			getDir("Talk", talk);
+			break;
+
+		case "`":
+			creative();
+			break;
+	}
 }
 
 function creative() {
-	if(party.vis==1) {
-		party.vis=99;
-		party.transport=1;
+	if(!party.creative) {
+		party.creative = true;
+		party.vis = 99;
+		party.transport = 1;
 		feedback("Creative mode enabled");
 	}
 	else {
-		party.vis=1;
-		party.transport=0;
+		party.creative = false;
+		party.vis = 1;
+		party.transport = 0;
 		feedback("Creative mode disabled");
 	}
-	draw();
 }
 
-function switchMap(mapjs) {
-	var m = maps[mapjs.toLowerCase()];
+function switchMap(name) {
+	var m = maps[name.toLowerCase()];
 	if(m==null) {
-		feedback("Map not found!");
-		return;
+		feedback("BUG: map ["+name+"] not found!");
+		return false;
 	}
-	// save current map location
-	mapStack.push({map:map, x:viewX, y:viewY});
-
-	// switch to new map
 	map = m;
-	viewX = map.x;
-	viewY = map.y;
-	draw();
+	return true;
 }
 
 function enter() {
@@ -217,7 +239,13 @@ function enter() {
 		if(loc.x==viewX && loc.y==viewY) {
 			var town = loc.name;
 			feedback("Enter - "+town);
-			switchMap(town);
+			// save current map location
+			mapStack.push({map:map, x:viewX, y:viewY});
+
+			if(switchMap(town)) {
+				viewX = map.x;
+				viewY = map.y;
+			}
 			return;
 		}
 	}
@@ -234,7 +262,26 @@ function leave() {
 	map = ms.map;
 	viewX = ms.x;
 	viewY = ms.y;
-	draw();
+}
+
+function climb() {
+	var t = getMap(viewX, viewY);
+	if((t == 27 || party.creative) && map.up!=null) {
+		feedback("Klimb");
+		switchMap(map.up);
+	}
+	else
+		feedback("Klimb what?");
+}
+
+function descend() {
+	var t = getMap(viewX, viewY);
+	if((t == 27 || party.creative) && map.down!=null) {
+		feedback("Descend");
+		switchMap(map.down);
+	}
+	else
+		feedback("Descend what?");
 }
 
 function talk(dx, dy) {
@@ -268,8 +315,35 @@ function talk(dx, dy) {
 
 		feedbackPrompt("");
 		feedback(r);
+
+		var q = ai.questions[say];
+		if(q != null) {
+			feedbackPrompt("");
+			feedback(q.text+"? ");
+
+			var save = inputCallback;
+			inputCallback = function(line) {
+				if(line[0]=="y") {
+					feedbackPrompt("");
+					feedback(q.yes);
+					feedbackPrompt("- ");
+					inputCallback = save;
+				}
+				else if(line[0]=="n") {
+					feedbackPrompt("");
+					feedback(q.no);
+					feedbackPrompt("- ");
+					inputCallback = save;
+				}
+				else {
+					feedbackPrompt("");
+					feedback("Yes or no? ");
+				}
+			};
+		}
+
 		feedbackPrompt("- ");
-	}
+	};
 }
 
 var mouseState = 0;
@@ -370,9 +444,53 @@ function moveAI() {
 	if(folk==null) return;
 
 	var i; for(i=0; i<folk.length; i++) {
+		var ai = folk[i];
+		switch(ai.behaviour) {
+		case "Static":
+			break;
+
+		case "Wander":
+			var dx = Math.floor(Math.random()*3-1);
+			var dy = Math.floor(Math.random()*3-1);
+			if(canMove(ai.x+dx, ai.y+dy)) {
+				ai.x += dx;
+				ai.y += dy;
+			}
+			break;
+
+		case "Follow":
+			var dx = sign(viewX-ai.x);
+			var dy = sign(viewY-ai.y);
+			if(canMove(ai.x+dx, ai.y+dy)) {
+				ai.x += dx;
+				ai.y += dy;
+			}
+			else {
+				var mx = Math.abs(viewX-ai.x);
+				var my = Math.abs(viewY-ai.y);
+				if(mx >= my && canMove(ai.x+dx, ai.y)) ai.x += dx;
+				else if(canMove(ai.x, ai.y+dy)) ai.y += dy;
+				else if(canMove(ai.x+dx, ai.y)) ai.x += dx;
+			}
+			break;
+
+		case "Attack":			
+			var dx = sign(viewX-ai.x);
+			var dy = sign(viewY-ai.y);
+			if(canMove(ai.x+dx, ai.y+dy)) {
+				ai.x += dx;
+				ai.y += dy;
+			}
+			break;
+		}
 	}
 }
 
+function canMove(x, y) {
+	var t = getMap(x,y);
+	var p = canPass(t);
+	return Math.random() < p;
+}
 
 //-------------------------------------------------------------
 // tile functions
@@ -394,8 +512,6 @@ function getVis(c) {
 
 // Probability that player can move through this tile
 function canPass(c) {
-	if(party.transport==1) return 1.0;
-
 	switch(c) {
 		case 3:
 			return 0.5;
@@ -594,17 +710,19 @@ function move(dx, dy) {
 	var pass = canPass(getMap(x,y));
 	var text = getMoveText(dx, dy);
 
-	if(pass == 0.0) {
-		text += " - Blocked";
-		feedback(text);
-		return;
-	}
-
-	if(pass != 1.0) {
-		if(Math.random() > pass) {
-			text += " - slow progress";
+	if(party.transport==0) {
+		if(pass == 0.0) {
+			text += " - Blocked";
 			feedback(text);
 			return;
+		}
+
+		if(pass != 1.0) {
+			if(Math.random() > pass) {
+				text += " - slow progress";
+				feedback(text);
+				return;
+			}
 		}
 	}
 
@@ -616,7 +734,7 @@ function move(dx, dy) {
 	if(viewX >= map.width) viewX = 0;
 	if(viewY < 0) viewY = map.height-1;
 	if(viewY >= map.height) viewY = 0;
-	draw();
+	//draw();
 }
 
 // doesn't work in chrome, so using script map instead
