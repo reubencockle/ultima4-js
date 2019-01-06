@@ -41,20 +41,21 @@ function init() {
 
 	var main = document.getElementById("main");
 	main.addEventListener("keydown", keydown);
-	draw();
+	refresh();
 
 	feedbackPrompt("> ");
-	//var music = document.getElementById("music");
-	//music.autoplay=true;
-	//music.loop=true;
-	//music.load();
-	//setTimeout( function(){ music.play(); }, 3000);
 }
 
 function debug(msg) {
 	var e = document.getElementById("debug");
 	if(e==null) return;
 	e.innerText = msg;
+}
+
+var refreshTimer;
+function refresh() {
+	draw();
+	refreshTimer = setTimeout(refresh, 300);
 }
 
 //-------------------------------------------------------------
@@ -74,29 +75,29 @@ function getDir(msg, f) {
 	feedback(msg+" - ");
 	inputCallback = function(c) {
 		switch(c) {
-		case "ArrowLeft":
-			feedback("West");
-			feedbackPrompt("");
-			f(-1,0);
-			break;
-		case "ArrowRight":
-			feedback("East");
-			feedbackPrompt("");
-			f(1,0);
-			break;
-		case "ArrowUp":
-			feedback("North");
-			feedbackPrompt("");
-			f(0,-1);
-			break;
-		case "ArrowDown":
-			feedback("South");
-			feedbackPrompt("");
-			f(0,1);
-			break;
-		default:
-			feedback("Cancel");
-			break;
+			case "ArrowLeft":
+				feedback("West");
+				feedbackPrompt("");
+				f(-1,0);
+				break;
+			case "ArrowRight":
+				feedback("East");
+				feedbackPrompt("");
+				f(1,0);
+				break;
+			case "ArrowUp":
+				feedback("North");
+				feedbackPrompt("");
+				f(0,-1);
+				break;
+			case "ArrowDown":
+				feedback("South");
+				feedbackPrompt("");
+				f(0,1);
+				break;
+			default:
+				feedback("Cancel");
+				break;
 		}
 	};
 	inputMode = 2;
@@ -132,9 +133,6 @@ function input(c) {
 	}
 
 	if(inputMode==0) {
-		moveAI();
-		draw();
-		feedbackPrompt("> ");
 	}
 }
 
@@ -204,6 +202,10 @@ function command(c) {
 			creative();
 			break;
 	}
+
+	moveAI();
+	draw();
+	feedbackPrompt("> ");
 }
 
 function creative() {
@@ -350,7 +352,7 @@ var mouseState = 0;
 var mouseDX = 0;
 var mouseDY = 0;
 var mouseDir = -1;
-var moveTimer = undefined;
+var moveCmds = ["4", "7", "8", "9", "6", "3", "2", "1"];	// movement commands
 
 function mouseDown(event) {
 	mouseMove(event);
@@ -366,7 +368,9 @@ function mapMove() {
 			break;
 
 		case 1:
-			move(mouseDX, mouseDY);
+			if(mouseDir >= 0)
+				command(moveCmds[mouseDir]);
+			//move(mouseDX, mouseDY);
 			mouseState=2;
 			setTimeout(mapMove, mouseSpeed);
 			break;
@@ -378,7 +382,6 @@ function mapMove() {
 
 function mouseUp(event) {
 	mouseState = 0;
-	window.clearInterval(moveTimer);
 }
 
 function mouseOut(event) {
@@ -446,50 +449,70 @@ function moveAI() {
 	var i; for(i=0; i<folk.length; i++) {
 		var ai = folk[i];
 		switch(ai.behaviour) {
-		case "Static":
-			break;
+			case "Static":
+				break;
 
-		case "Wander":
-			var dx = Math.floor(Math.random()*3-1);
-			var dy = Math.floor(Math.random()*3-1);
-			if(canMove(ai.x+dx, ai.y+dy)) {
-				ai.x += dx;
-				ai.y += dy;
-			}
-			break;
+			case "Wander":
+				var dx = Math.floor(Math.random()*3-1);
+				var dy = Math.floor(Math.random()*3-1);
+				if(canMove(ai.x+dx, ai.y+dy)) doMove(ai, dx, dy, null);
+				break;
 
-		case "Follow":
-			var dx = sign(viewX-ai.x);
-			var dy = sign(viewY-ai.y);
-			if(canMove(ai.x+dx, ai.y+dy)) {
-				ai.x += dx;
-				ai.y += dy;
-			}
-			else {
-				var mx = Math.abs(viewX-ai.x);
-				var my = Math.abs(viewY-ai.y);
-				if(mx >= my && canMove(ai.x+dx, ai.y)) ai.x += dx;
-				else if(canMove(ai.x, ai.y+dy)) ai.y += dy;
-				else if(canMove(ai.x+dx, ai.y)) ai.x += dx;
-			}
-			break;
-
-		case "Attack":			
-			var dx = sign(viewX-ai.x);
-			var dy = sign(viewY-ai.y);
-			if(canMove(ai.x+dx, ai.y+dy)) {
-				ai.x += dx;
-				ai.y += dy;
-			}
-			break;
+			case "Follow":
+			case "Attack":			
+				var dx = sign(viewX-ai.x);
+				var dy = sign(viewY-ai.y);
+				if(!canMove(ai.x+dx, ai.y+dy)) {
+					var mx = Math.abs(viewX-ai.x);
+					var my = Math.abs(viewY-ai.y);
+					if(mx >= my && canMove(ai.x+dx, ai.y)) dy=0;
+					else if(canMove(ai.x, ai.y+dy)) dx=0;
+					else if(canMove(ai.x+dx, ai.y)) dy=0;
+					else { dx=0; dy=0; }
+				}
+				doMove(ai, dx, dy, null);
+				break;
 		}
 	}
 }
 
 function canMove(x, y) {
+	// can't move offmap
+	if(!map.wrap && (x<0 || x>=map.width || y<0 || y>=map.height)) return false;
+
 	var t = getMap(x,y);
-	var p = canPass(t);
-	return Math.random() < p;
+	var p = canPass(t);	// TODO: depends on AI/transport
+	if(Math.random() > p) return false;
+
+	return true;
+}
+
+// move if no ai occupies the target space, otherwise execute collision function
+function doMove(me, dx, dy, collision) {
+	var x = me.x + dx;
+	var y = me.y + dy;
+
+	var folk = map.folk;
+	if(folk != null) {
+		var i; for(i=0; i<folk.length; i++) {
+			var ai = folk[i];
+			if(ai.x == x && ai.y == y) {
+				if(collision != null) collision(me, ai);
+				return;
+			}
+		}
+	}
+	me.x = x;
+	me.y = y;
+}
+
+// return ai at x, y
+function collision(x, y) {
+	var i; for(i=0; i<folk.length; i++) {
+		var ai = folk[i];
+		if(ai.x == x && ai.y == y) return ai;
+	}
+	return null;
 }
 
 //-------------------------------------------------------------
@@ -581,6 +604,10 @@ function getAI(x, y) {
 	return null;
 }
 
+function getAITile(ai) {
+	return (ai.tile & 0xFE) + Math.floor(Math.random()*2);
+}
+
 function getTile(c) {
 	var x = c & 15;
 	var y = c >> 4;
@@ -644,7 +671,7 @@ function draw() {
 			else if(vis[y*viewWidth+x] > party.vis) c = 126;	// can't see FIXME
 			else {
 				var ai = getAI(viewX+offsetX, viewY+offsetY);
-				if(ai!=null) c = ai.tile;
+				if(ai!=null) c = getAITile(ai);
 				else c = getMap(viewX+offsetX, viewY+offsetY);
 			}
 			t.style.backgroundPosition = getTile(c);

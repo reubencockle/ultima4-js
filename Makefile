@@ -3,7 +3,7 @@ U4TOJS=dotnet tools/u4tojs/u4tojs/bin/Debug/netcoreapp2.1/u4tojs.dll
 maps/%.js: resources/%.ULT data/%.js resources/%.TLK
 	$(U4TOJS) $@ $^
 
-all: maps/WORLD.js maps/BRITAIN.js maps/PAWS.js maps/SKARA.js maps/YEW.js maps/LYCAEUM.js maps/LCB_1.js maps/LCB_2.js
+all: maps/WORLD.js maps/BRITAIN.js maps/PAWS.js maps/SKARA.js maps/YEW.js maps/LYCAEUM.js maps/LCB_1.js maps/LCB_2.js maps/VESPER.js
 
 clean:
 	rm maps/*

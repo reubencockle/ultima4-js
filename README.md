@@ -30,21 +30,38 @@ Create a simple Ultima IV like game using javascript and HTML that can be played
 
 
 ## To Do
+### Maps
 - [X] view referenced map with keyboard controls for North, West, East, South
 - [X] tool to convert .ULT + .TLK files into map/.js files (u4tojs)
 - [X] mouse controls for movement
 - [X] visibility map to hide objects the player can't see
 - [X] creative mode ignores blockers and shows all of the map
-- [X] talk to towns folk
-- [ ] cleanup layout
-- [ ] folk animation
-- [ ] shop keepers
 - [ ] water animation (uses fancy bitmap manipulation inreal game)
-- [ ] mosters
-- [ ] combat
-- [ ] dungeons
-- [ ] party/characters
 - [ ] gem view
+
+### Towns
+- [X] include towns folk (AIs) in map files
+- [X] talk to towns folk (AIs)
+- [X] AI animation
+- [ ] don't allow AIs to walk off map
+- [ ] don't allow AIs to occupy the same tile
+- [ ] shop keeper AIs
+- [ ] extract AI functions into classes - for towns folk, monsters, and player.
+
+### UI
+- [ ] cleanup layout
+
+### Monsters
+_needs break down_
+
+### Combat
+_needs break down_
+
+### Dungeons
+_needs break down_
+
+### Party/Characters
+_needs break down_
 
 
 ## Design
